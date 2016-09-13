@@ -39,8 +39,8 @@ import java.util.concurrent.TimeUnit;
 
 
 public class SlackNotificationImpl implements SlackNotification {
-	
-	private static final String UTF8 = "UTF-8";
+
+  private static final String UTF8 = "UTF-8";
 
     private String proxyHost;
     private Integer proxyPort = 0;
@@ -71,8 +71,8 @@ public class SlackNotificationImpl implements SlackNotification {
     private boolean mentionChannelEnabled;
     private boolean mentionSlackUserEnabled;
     private boolean showFailureReason;
-	
-/*	This is a bit mask of states that should trigger a SlackNotification.
+
+/*  This is a bit mask of states that should trigger a SlackNotification.
  *  All ones (11111111) means that all states will trigger the slacknotifications
  *  We'll set that as the default, and then override if we get a more specific bit mask. */
     //private Integer EventListBitMask = BuildState.ALL_ENABLED;
@@ -132,21 +132,21 @@ public class SlackNotificationImpl implements SlackNotification {
     public void setProxy(String proxyHost, Integer proxyPort, Credentials credentials) {
         this.proxyHost = proxyHost;
         this.proxyPort = proxyPort;
-        
-		if (this.proxyHost.length() > 0 && !this.proxyPort.equals(0)) {
+
+    if (this.proxyHost.length() > 0 && !this.proxyPort.equals(0)) {
             HttpClientBuilder clientBuilder = HttpClients.custom()
                 .useSystemProperties()
                 .setProxy(new HttpHost(proxyHost, proxyPort, "http"));
-                
+
             if (credentials != null) {
                 CredentialsProvider credsProvider = new BasicCredentialsProvider();
                 credsProvider.setCredentials(new AuthScope(proxyHost, proxyPort), credentials);
                 clientBuilder.setDefaultCredentialsProvider(credsProvider);
                 Loggers.SERVER.debug("SlackNotification ::using proxy credentials " + credentials.getUserPrincipal().getName());
             }
-            
+
             this.client = clientBuilder.build();
-		}
+    }
     }
 
     public void post() throws IOException {
@@ -232,7 +232,7 @@ public class SlackNotificationImpl implements SlackNotification {
 
             if (this.payload != null) {
                 requestBody.setText(payload.getBuildDescriptionWithLinkSyntax());
-                requestBody.setAttachments(getAttachments());
+                // requestBody.setAttachments(getAttachments());
             }
 
             String bodyParam = String.format("payload=%s", URLEncoder.encode(requestBody.toJson(), UTF8));
@@ -563,13 +563,13 @@ public class SlackNotificationImpl implements SlackNotification {
         this.errorReason = errorReason;
     }
 
-//	public Integer getEventListBitMask() {
-//		return EventListBitMask;
-//	}
+//  public Integer getEventListBitMask() {
+//    return EventListBitMask;
+//  }
 //
-//	public void setTriggerStateBitMask(Integer triggerStateBitMask) {
-//		EventListBitMask = triggerStateBitMask;
-//	}
+//  public void setTriggerStateBitMask(Integer triggerStateBitMask) {
+//    EventListBitMask = triggerStateBitMask;
+//  }
 
     public String getProxyUsername() {
         return proxyUsername;
@@ -623,7 +623,7 @@ public class SlackNotificationImpl implements SlackNotification {
     public void setShowCommits(boolean showCommits) {
         this.showCommits = showCommits;
     }
-	
+
     @Override
     public void setShowCommitters(boolean showCommitters) {
         this.showCommitters = showCommitters;
