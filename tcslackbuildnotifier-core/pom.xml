@@ -9,6 +9,10 @@
   </parent>
   <artifactId>tcslackbuildnotifier-core</artifactId>
 
+  <properties>
+    <additionalparam>-Xdoclint:none</additionalparam>
+  </properties>
+
   <build>
     <defaultGoal>package</defaultGoal>
     <plugins>
@@ -84,10 +88,10 @@
         <version>2.1</version>
       </plugin>
 
-      <plugin>
+      <!-- <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>cobertura-maven-plugin</artifactId>
-      </plugin>
+      </plugin> -->
 
     </plugins>
   </reporting>
