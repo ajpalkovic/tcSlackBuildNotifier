@@ -156,7 +156,7 @@ public class SlackNotificationPayloadContent {
     private void populateArtifacts(SRunningBuild runningBuild) {
 			//ArtifactsInfo artInfo = new ArtifactsInfo(runningBuild);
 			//artInfo.
-			
+
 		}
 
 		/**
@@ -173,12 +173,12 @@ public class SlackNotificationPayloadContent {
 			setBuildStatusUrl(server.getRootUrl() + "/viewLog.html?buildTypeId=" + buildType.getBuildTypeId() + "&buildId=lastFinished");
 
 		}
-		
+
 		private void populateMessageAndText(SRunningBuild sRunningBuild,
 				BuildStateEnum state) {
 			// Message is a long form message, for on webpages or in email.
 
-			// Text is designed to be shorter, for use in Text messages and the like.    		
+			// Text is designed to be shorter, for use in Text messages and the like.
     		setText(getBuildDescriptionWithLinkSyntax()
                     + " has " + state.getDescriptionSuffix() + ". Status: " + this.buildResult);
 
@@ -217,15 +217,15 @@ public class SlackNotificationPayloadContent {
         }
         setBuildStatusUrl(server.getRootUrl() + "/viewLog.html?buildTypeId=" + getBuildTypeId() + "&buildId=" + getBuildId());
         String branchSuffix = (getBranchIsDefault() != null && getBranchIsDefault()) || getBranchDisplayName() == null ? "" : (" [" + getBranchDisplayName() + "]");
-        setBuildDescriptionWithLinkSyntax(String.format("<" + getBuildStatusUrl() + "|" + getBuildResult() + " - " + sRunningBuild.getBuildType().getFullName() + " #" + sRunningBuild.getBuildNumber() + branchSuffix + ">"));
+        setBuildDescriptionWithLinkSyntax(String.format("<" + getBuildStatusUrl() + "|" + getBuildResult() + " - " + sRunningBuild.getBuildType().getName() + branchSuffix + ">"));
     }
-		
-		
+
+
 
 		private Branch getBranch() {
 			return this.branch;
 		}
-		
+
 		public void setBranch(Branch branch) {
 			this.branch = branch;
 		}
@@ -233,7 +233,7 @@ public class SlackNotificationPayloadContent {
 		public String getBranchDisplayName() {
 			return this.branchDisplayName;
 		}
-		
+
 		public void setBranchDisplayName(String displayName) {
 			this.branchDisplayName = displayName;
 		}
@@ -250,7 +250,7 @@ public class SlackNotificationPayloadContent {
 
 		/**
 		 * Determines a useful build result. The one from TeamCity can't be trusted because it
-		 * is not set until all the Notifiers have run, of which we are one. 
+		 * is not set until all the Notifiers have run, of which we are one.
 		 * @param sRunningBuild
 		 * @param previousBuild
 		 * @param buildState
@@ -260,7 +260,7 @@ public class SlackNotificationPayloadContent {
 
 
 			if (previousBuild != null){
-				if (previousBuild.isFinished()){ 
+				if (previousBuild.isFinished()){
 					if (previousBuild.getStatusDescriptor().isSuccessful()){
 						this.buildResultPrevious = BUILD_STATUS_SUCCESS;
 					} else {
@@ -275,7 +275,7 @@ public class SlackNotificationPayloadContent {
 
             isComplete = buildState == BuildStateEnum.BUILD_FINISHED;
 
-			if (buildState == BuildStateEnum.BEFORE_BUILD_FINISHED || buildState == BuildStateEnum.BUILD_FINISHED){ 
+			if (buildState == BuildStateEnum.BEFORE_BUILD_FINISHED || buildState == BuildStateEnum.BUILD_FINISHED){
 				if (sRunningBuild.getStatusDescriptor().isSuccessful()){
 					this.buildResult = BUILD_STATUS_SUCCESS;
                     this.color = "good";
@@ -298,11 +298,11 @@ public class SlackNotificationPayloadContent {
 				this.buildResult = BUILD_STATUS_RUNNING;
 				this.buildResultDelta = BUILD_STATUS_UNKNOWN;
 			}
-			
+
 		}
 
 		// Getters and setters
-		
+
 
 		public String getBuildResult() {
 			return buildResult;

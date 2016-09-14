@@ -169,7 +169,7 @@ public class SlackNotificationImpl implements SlackNotification {
                     this.botName == null ? "" : URLEncoder.encode(this.botName, UTF8),
                     this.iconUrl == null ? "" : URLEncoder.encode(this.iconUrl, UTF8),
                     this.channel == null ? "" : URLEncoder.encode(this.channel, UTF8),
-                    this.payload == null ? "" : URLEncoder.encode(payload.getBuildDescriptionWithLinkSyntax(), UTF8),
+                    this.payload == null ? "" : URLEncoder.encode(getMessageText(), UTF8),
                     "");
 
             HttpPost httppost = new HttpPost(url);
@@ -179,17 +179,17 @@ public class SlackNotificationImpl implements SlackNotification {
                 File file = new File(this.filename);
                 throw new NotImplementedException();
             }
-            if (this.payload != null) {
+            // if (this.payload != null) {
 
-                List<Attachment> attachments = getAttachments();
+            //     List<Attachment> attachments = getAttachments();
 
-                String attachmentsParam = String.format("attachments=%s", URLEncoder.encode(convertAttachmentsToJson(attachments), UTF8));
+            //     String attachmentsParam = String.format("attachments=%s", URLEncoder.encode(convertAttachmentsToJson(attachments), UTF8));
 
-                Loggers.SERVER.info("SlackNotificationListener :: Body message will be " + attachmentsParam);
+            //     Loggers.SERVER.info("SlackNotificationListener :: Body message will be " + attachmentsParam);
 
-                httppost.setEntity(new StringEntity(attachmentsParam));
-                httppost.setHeader("Content-Type", CONTENT_TYPE);
-            }
+            //     httppost.setEntity(new StringEntity(attachmentsParam));
+            //     httppost.setHeader("Content-Type", CONTENT_TYPE);
+            // }
             try {
                 HttpResponse response = client.execute(httppost);
                 this.resultCode = response.getStatusLine().getStatusCode();
@@ -231,7 +231,7 @@ public class SlackNotificationImpl implements SlackNotification {
             HttpPost httppost = new HttpPost(url);
 
             if (this.payload != null) {
-                requestBody.setText(payload.getBuildDescriptionWithLinkSyntax());
+                requestBody.setText(getMessageText());
                 // requestBody.setAttachments(getAttachments());
             }
 
@@ -266,104 +266,193 @@ public class SlackNotificationImpl implements SlackNotification {
         }
     }
 
-    private List<Attachment> getAttachments() {
-        List<Attachment> attachments = new ArrayList<Attachment>();
-        Attachment attachment = new Attachment(this.payload.getBuildName(), null, null, this.payload.getColor());
+    private String getMessageText() {
+      String message = payload.getBuildDescriptionWithLinkSyntax();
 
-        List<String> firstDetailLines = new ArrayList<String>();
-        if(showBuildAgent == null || showBuildAgent){
-            firstDetailLines.add("Agent: " + this.payload.getAgentName());
+      if (this.payload.getBuildResult() == SlackNotificationPayloadContent.BUILD_STATUS_FAILURE &&
+          this.payload.getFailedBuildMessages().size() > 0 &&
+          this.payload.getFailedBuildMessages().get(0).contains("Snapshot dependency")) {
+        return message + " failed because it's dependencies failed (" + StringUtil.join(", ", payload.getFailedBuildMessages()) + ")";
+      }
+
+      List<Commit> commits = this.payload.getCommits();
+      List<String> slackUsers = new ArrayList<String>();
+      for (Commit commit : commits) {
+        if (commit.hasSlackUsername()) {
+          slackUsers.add("@" + commit.getSlackUserName());
         }
-        if(this.payload.getIsComplete() && (showElapsedBuildTime == null || showElapsedBuildTime)){
-            firstDetailLines.add("Elapsed: " + formatTime(this.payload.getElapsedTime()));
+      }
+      slackUsers = new ArrayList<String>(new HashSet<String>(slackUsers));
+
+      // Mention the channel and/or the Slack Username of any committers if known
+      if (payload.getIsFirstFailedBuild() && (mentionChannelEnabled || (mentionSlackUserEnabled && !slackUsers.isEmpty()))) {
+        String mentionContent = ":arrow_up: \"" + this.payload.getBuildName() + "\" Failed ";
+        if(mentionChannelEnabled) {
+          mentionContent += "<!channel> ";
         }
-
-        attachment.addField(this.payload.getBuildName(), StringUtil.join(firstDetailLines, "\n"), false);
-
-        if(showFailureReason && this.payload.getBuildResult() == SlackNotificationPayloadContent.BUILD_STATUS_FAILURE){
-            if(this.payload.getFailedBuildMessages().size() > 0) {
-                attachment.addField("Reason", StringUtil.join(", ", payload.getFailedBuildMessages()), false);
-            }
-            if(this.payload.getFailedTestNames().size() > 0){
-                ArrayList<String> failedTestNames = payload.getFailedTestNames();
-                String truncated = "";
-                if(failedTestNames.size() > 10){
-                    failedTestNames = new ArrayList<String>( failedTestNames.subList(0, 9));
-                    truncated = " (+ " + Integer.toString(payload.getFailedBuildMessages().size() - 10) + " more)";
-                }
-                payload.getFailedTestNames().size();
-                attachment.addField("Failed Tests", StringUtil.join(", ", failedTestNames) + truncated, false);
-            }
+        if (mentionSlackUserEnabled && !slackUsers.isEmpty() && !this.payload.isMergeBranch()) {
+          mentionContent += StringUtil.join(" ", slackUsers);
         }
 
-        StringBuilder sbCommits = new StringBuilder();
+        message += " (" + mentionContent + ")";
+      }
 
-        List<Commit> commits = this.payload.getCommits();
-
-        List<Commit> commitsToDisplay = new ArrayList<Commit>(commits);
-
-        if(showCommits) {
-            boolean truncated = false;
-            int totalCommits = commitsToDisplay.size();
-            if (commitsToDisplay.size() > maxCommitsToDisplay) {
-                commitsToDisplay = commitsToDisplay.subList(0, maxCommitsToDisplay > commitsToDisplay.size() ? commitsToDisplay.size() : 5);
-                truncated = true;
-            }
-
-            for (Commit commit : commitsToDisplay) {
-                String revision = commit.getRevision();
-                revision = revision == null ? "" : revision;
-                sbCommits.append(String.format("%s :: %s :: %s\n", revision.substring(0, Math.min(revision.length(), 10)), commit.getUserName(), commit.getDescription()));
-            }
-
-            if (truncated) {
-                sbCommits.append(String.format("(+ %d more)\n", totalCommits - 5));
-            }
-
-            if (!commitsToDisplay.isEmpty()) {
-                attachment.addField("Commits", sbCommits.toString(), false);
-            }
+      if (showFailureReason && this.payload.getBuildResult() == SlackNotificationPayloadContent.BUILD_STATUS_FAILURE) {
+        if (this.payload.getFailedBuildMessages().size() > 0) {
+          message += " because " + StringUtil.join(", ", payload.getFailedBuildMessages());
         }
 
-        List<String> slackUsers = new ArrayList<String>();
-
-
-        for(Commit commit : commits){
-            if(commit.hasSlackUsername()){
-                slackUsers.add("@" + commit.getSlackUserName());
-            }
+        if (this.payload.getFailedTestNames().size() > 0) {
+          ArrayList<String> failedTestNames = payload.getFailedTestNames();
+          String truncated = "";
+          if (failedTestNames.size() > 3) {
+            failedTestNames = new ArrayList<String>(failedTestNames.subList(0, 2));
+            truncated = " (+ " + Integer.toString(payload.getFailedBuildMessages().size() - 3) + " more)";
+          }
+          payload.getFailedTestNames().size();
+          message += " while running " + StringUtil.join(", ", failedTestNames) + truncated;
         }
-        HashSet<String> tempHash = new HashSet<String>(slackUsers);
-        slackUsers = new ArrayList<String>(tempHash);
+      }
 
-        if(showCommitters) {
-            Set<String> committers = new HashSet<String>();
-            for (Commit commit : commits) {
-                committers.add(commit.getUserName());
-            }
-
-            String committersString = StringUtil.join(", ", committers);
-
-            if (!commits.isEmpty()) {
-                attachment.addField("Changes By", committersString, false);
-            }
+      if (showCommitters) {
+        Set<String> committers = new HashSet<String>();
+        for (Commit commit : commits) {
+          committers.add(commit.getUserName());
         }
 
-        // Mention the channel and/or the Slack Username of any committers if known
-        if(payload.getIsFirstFailedBuild() && (mentionChannelEnabled || (mentionSlackUserEnabled && !slackUsers.isEmpty()))){
-            String mentionContent = ":arrow_up: \"" + this.payload.getBuildName() + "\" Failed ";
-            if(mentionChannelEnabled){
-                mentionContent += "<!channel> ";
-            }
-            if(mentionSlackUserEnabled && !slackUsers.isEmpty() && !this.payload.isMergeBranch()) {
-                mentionContent += StringUtil.join(" ", slackUsers);
-            }
-            attachment.addField("", mentionContent, true);
+        String committersString = StringUtil.join(", ", committers);
+
+        if (!commits.isEmpty()) {
+          message += " with changes from " + committersString;
+        }
+      }
+
+      StringBuilder sbCommits = new StringBuilder();
+      List<Commit> commitsToDisplay = new ArrayList<Commit>(commits);
+
+      if (showCommits) {
+        boolean truncated = false;
+        int totalCommits = commitsToDisplay.size();
+        if (commitsToDisplay.size() > maxCommitsToDisplay) {
+          commitsToDisplay = commitsToDisplay.subList(0, maxCommitsToDisplay > commitsToDisplay.size() ? commitsToDisplay.size() : 5);
+          truncated = true;
         }
 
-        attachments.add(attachment);
-        return attachments;
+        for (Commit commit : commitsToDisplay) {
+          String revision = commit.getRevision();
+          revision = revision == null ? "" : revision;
+          sbCommits.append(String.format("%s :: %s :: %s\n", revision.substring(0, Math.min(revision.length(), 10)), commit.getUserName(), commit.getDescription().trim().split("\n", 2)[0]));
+        }
+
+        if (truncated) {
+          sbCommits.append(String.format("(+ %d more)\n", totalCommits - 5));
+        }
+
+        if (!commitsToDisplay.isEmpty()) {
+          message += " on commits: " + sbCommits.toString();
+        }
+      }
+
+      return message;
     }
+
+    // private List<Attachment> getAttachments() {
+    //     List<Attachment> attachments = new ArrayList<Attachment>();
+    //     Attachment attachment = new Attachment(this.payload.getBuildName(), null, null, this.payload.getColor());
+
+    //     List<String> firstDetailLines = new ArrayList<String>();
+    //     if(showBuildAgent == null || showBuildAgent){
+    //         firstDetailLines.add("Agent: " + this.payload.getAgentName());
+    //     }
+    //     if(this.payload.getIsComplete() && (showElapsedBuildTime == null || showElapsedBuildTime)){
+    //         firstDetailLines.add("Elapsed: " + formatTime(this.payload.getElapsedTime()));
+    //     }
+
+    //     attachment.addField(this.payload.getBuildName(), StringUtil.join(firstDetailLines, "\n"), false);
+
+    //     if(showFailureReason && this.payload.getBuildResult() == SlackNotificationPayloadContent.BUILD_STATUS_FAILURE){
+    //         if(this.payload.getFailedBuildMessages().size() > 0) {
+    //             attachment.addField("Reason", StringUtil.join(", ", payload.getFailedBuildMessages()), false);
+    //         if(this.payload.getFailedTestNames().size() > 0){
+    //             ArrayList<String> failedTestNames = payload.getFailedTestNames();
+    //             String truncated = "";
+    //             if(failedTestNames.size() > 10){
+    //                 failedTestNames = new ArrayList<String>( failedTestNames.subList(0, 9));
+    //                 truncated = " (+ " + Integer.toString(payload.getFailedBuildMessages().size() - 10) + " more)";
+    //             }
+    //             payload.getFailedTestNames().size();
+    //             attachment.addField("Failed Tests", StringUtil.join(", ", failedTestNames) + truncated, false);
+    //         }
+    //     }
+
+    //     StringBuilder sbCommits = new StringBuilder();
+
+    //     List<Commit> commits = this.payload.getCommits();
+
+    //     List<Commit> commitsToDisplay = new ArrayList<Commit>(commits);
+
+    //     if(showCommits) {
+    //         boolean truncated = false;
+    //         int totalCommits = commitsToDisplay.size();
+    //         if (commitsToDisplay.size() > maxCommitsToDisplay) {
+    //             commitsToDisplay = commitsToDisplay.subList(0, maxCommitsToDisplay > commitsToDisplay.size() ? commitsToDisplay.size() : 5);
+    //             truncated = true;
+    //         }
+
+    //         for (Commit commit : commitsToDisplay) {
+    //             String revision = commit.getRevision();
+    //             revision = revision == null ? "" : revision;
+    //             sbCommits.append(String.format("%s :: %s :: %s\n", revision.substring(0, Math.min(revision.length(), 10)), commit.getUserName(), commit.getDescription()));
+    //         }
+
+    //         if (truncated) {
+    //             sbCommits.append(String.format("(+ %d more)\n", totalCommits - 5));
+    //         }
+
+    //         if (!commitsToDisplay.isEmpty()) {
+    //             attachment.addField("Commits", sbCommits.toString(), false);
+    //         }
+    //     }
+
+    //     List<String> slackUsers = new ArrayList<String>();
+
+
+    //     for(Commit commit : commits){
+    //         if(commit.hasSlackUsername()){
+    //             slackUsers.add("@" + commit.getSlackUserName());
+    //         }
+    //     }
+    //     HashSet<String> tempHash = new HashSet<String>(slackUsers);
+    //     slackUsers = new ArrayList<String>(tempHash);
+
+    //     if(showCommitters) {
+    //         Set<String> committers = new HashSet<String>();
+    //         for (Commit commit : commits) {
+    //             committers.add(commit.getUserName());
+    //         }
+
+    //         String committersString = StringUtil.join(", ", committers);
+
+    //         if (!commits.isEmpty()) {
+    //             attachment.addField("Changes By", committersString, false);
+    //         }
+    //     }
+
+    //     // Mention the channel and/or the Slack Username of any committers if known
+    //     if(payload.getIsFirstFailedBuild() && (mentionChannelEnabled || (mentionSlackUserEnabled && !slackUsers.isEmpty()))){
+    //         String mentionContent = ":arrow_up: \"" + this.payload.getBuildName() + "\" Failed ";
+    //         if(mentionChannelEnabled){
+    //             mentionContent += "<!channel> ";
+    //         }
+    //         if(mentionSlackUserEnabled && !slackUsers.isEmpty() && !this.payload.isMergeBranch()) {
+    //             mentionContent += StringUtil.join(" ", slackUsers);
+    //         }
+    //         attachment.addField("", mentionContent, true);
+    //     }
+
+    //     attachments.add(attachment);
+    //     return attachments;
+    // }
 
     private class WebHookPayload {
         private String channel;
