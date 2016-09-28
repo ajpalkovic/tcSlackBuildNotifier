@@ -272,7 +272,7 @@ public class SlackNotificationImpl implements SlackNotification {
       if (this.payload.getBuildResult() == SlackNotificationPayloadContent.BUILD_STATUS_FAILURE &&
           this.payload.getFailedBuildMessages().size() > 0 &&
           this.payload.getFailedBuildMessages().get(0).contains("Snapshot dependency")) {
-        return message + " failed because it's dependencies failed (" + StringUtil.join(", ", payload.getFailedBuildMessages()) + ")";
+        return message + " failed because its dependencies failed (" + StringUtil.join(", ", payload.getFailedBuildMessages()) + ")";
       }
 
       List<Commit> commits = this.payload.getCommits();
@@ -286,7 +286,7 @@ public class SlackNotificationImpl implements SlackNotification {
 
       // Mention the channel and/or the Slack Username of any committers if known
       if (payload.getIsFirstFailedBuild() && (mentionChannelEnabled || (mentionSlackUserEnabled && !slackUsers.isEmpty()))) {
-        String mentionContent = ":arrow_up: \"" + this.payload.getBuildName() + "\" Failed ";
+        String mentionContent = "";
         if(mentionChannelEnabled) {
           mentionContent += "<!channel> ";
         }
@@ -299,17 +299,16 @@ public class SlackNotificationImpl implements SlackNotification {
 
       if (showFailureReason && this.payload.getBuildResult() == SlackNotificationPayloadContent.BUILD_STATUS_FAILURE) {
         if (this.payload.getFailedBuildMessages().size() > 0) {
-          message += " because " + StringUtil.join(", ", payload.getFailedBuildMessages());
+          message += " because \"" + StringUtil.join(", ", payload.getFailedBuildMessages()) + "\"";
         }
 
         if (this.payload.getFailedTestNames().size() > 0) {
           ArrayList<String> failedTestNames = payload.getFailedTestNames();
           String truncated = "";
-          if (failedTestNames.size() > 3) {
+          if (failedTestNames.size() > 2) {
             failedTestNames = new ArrayList<String>(failedTestNames.subList(0, 2));
-            truncated = " (+ " + Integer.toString(payload.getFailedBuildMessages().size() - 3) + " more)";
+            truncated = " (+ " + Integer.toString(payload.getFailedTestNames().size() - 2) + " more)";
           }
-          payload.getFailedTestNames().size();
           message += " while running " + StringUtil.join(", ", failedTestNames) + truncated;
         }
       }
